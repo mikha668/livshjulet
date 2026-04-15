@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<title>Livshjulet</title>
+<style>
+body {
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: #fafafa;
+  text-align: center;
+  margin: 0; padding: 20px;
+  color: #374151;
+}
+h1 { font-weight: 600; margin-bottom: 5px; }
+p { color: #6b7280; margin-bottom: 20px; }
+.container { max-width: 800px; margin: auto; }
+canvas { display: block; margin: 0 auto; }
+
+.sliders {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  margin-top: 30px;
+}
+
+.card {
+  background: #fff;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid #e4e4e7;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+label { font-weight: 600; font-size: 15px; margin-bottom: 8px; display: block; }
+.row { font-size: 12px; display: flex; justify-content: space-between; color: #6b7280; margin-bottom: 6px; }
+
+input[type=range] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 8px;
+  border-radius: 6px;
+  background: #d1d5db;
+  outline: none;
+  margin: 6px 0 12px;
+  cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  border: none;
+  box-shadow: 0 0 4px rgba(0,0,0,0.2);
+  margin-top: -6px;
+}
+input[type=range]::-moz-range-thumb {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  border: none;
+  box-shadow: 0 0 4px rgba(0,0,0,0.2);
+}
+input[type=range]::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 6px;
+  background: linear-gradient(to right, var(--fill-color) 0%, var(--fill-color) calc(var(--percent) * 1%), #d1d5db calc(var(--percent) * 1%), #d1d5db 100%);
+}
+input[type=range].current { --fill-color:#3b82f6; --percent:0; }
+input[type=range].desired { --fill-color:#22c55e; --percent:0; }
+
+button {
+  margin-top: 20px; padding: 10px 18px; font-size: 14px;
+  border:none; border-radius:6px; background:#3b82f6; color:white; cursor:pointer;
+}
+
+.tooltip {
+  position:absolute;
+  background:#111827;
+  color:white;
+  padding:8px 10px;
+  border-radius:6px;
+  font-size:12px;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity 0.15s;
+  max-width:220px;
+  text-align:left;
+}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Livshjulet</h1>
+<p>Använd reglagen nedan för att fylla i ditt nuläge (blå) och ditt önskade läge (grön)</p>
+<canvas id="wheel" width="600" height="600"></canvas>
+<div class="sliders" id="sliders"></div>
+<button id="saveBtn">Spara livshjulet som PDF</button>
+<div class="tooltip" id="tooltip"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+const { jsPDF } = window.jspdf;
+
+const areas = ["Träning","Kropp","Sömn","Arbete","Fritid","Relationer","Mat","Utveckling"];
+const tips = [
+`Träning:\nTränar du regelbundet? Känner du dig stark? Uthållig? Snabb? Smidig? Vilken av de här kvalitéerna är du bra på och vad skulle du vilja förbättra? Hur fungerar rutiner kring träning och återhämtning?`,
+`Kropp:\nHur mår du i kroppen? Känns det skönt i kroppen eller har du ont någonstans? Hur känns din ork och energi? Hur tänker du på storlek och utseende? Hur känner du dig rent fysiskt? Hur är din hållning? Utstrålning? Är du tillfreds med din vikt? Fungerar din mage?`,
+`Sömn:\nSover du bra? Hur känner du dig när du vaknar? Hur mycket sover du? Vill du sova mer/mindre? Vilka rutiner har du runt sömnen? Hur fungerar dem? Har du regelbunden tid för återhämtning?`,
+`Arbete:\nTycker du om ditt jobb? Jobbar du lagom mycket? Hur står det till med relationerna på jobbet? Har du gott självförtroende och självkänsla? Känner du glädje, lustfylldhet, tillhörighet, meningsfullhet?`,
+`Fritid:\nHur känner du kring din fritid? Känner du dig stressad? Fylld av självförtroende, självkänsla? Meningsfullhet? Reflektera kring ärlighet, frihet, lust, glädje, tillhörighet.`,
+`Relationer:\nHur står det till med dina relationer, vänner, familj? Skapar de stress, självförtroende, självkänsla? Känner du glädje, lustfrihet, tillhörighet, meningsfullhet?`,
+`Mat:\nHur tänker du kring mat? Känner du lust och matglädje? Har du starkt sötsug? Vet du vad och när du ska äta för att må bra? Hur ser dina rutiner ut kring måltider och mellanmål?`,
+`Utveckling:\n(reflektera över personlig utveckling, lärande, mål, inspiration, kompetenser, nyfikenhet, kreativitet)`
+];
+const levels = 10;
+let current = Array(areas.length).fill(0);
+let desired = Array(areas.length).fill(0);
+
+const canvas = document.getElementById("wheel");
+const ctx = canvas.getContext("2d");
+const cx=300, cy=300, radius=240;
+const tooltip = document.getElementById("tooltip");
+
+function draw() {
+  ctx.clearRect(0,0,600,600);
+  const step = (Math.PI*2)/areas.length;
+  const colors = {current:"rgba(59,130,246,0.75)", desired:"rgba(34,197,94,0.6)", empty:"#f9fafb"};
+
+  for(let i=0;i<areas.length;i++){
+    for(let l=1;l<=levels;l++){
+      let start=i*step, end=start+step;
+      let inner=(radius/levels)*(l-1), outer=(radius/levels)*l;
+      ctx.beginPath();
+      ctx.arc(cx,cy,outer,start,end);
+      ctx.arc(cx,cy,inner,end,start,true);
+      ctx.closePath();
+      if(l<=current[i]) ctx.fillStyle=colors.current;
+      else if(l<=desired[i]) ctx.fillStyle=colors.desired;
+      else ctx.fillStyle=colors.empty;
+      ctx.fill();
+    }
+  }
+
+  ctx.strokeStyle="#d1d5db"; ctx.lineWidth=0.6;
+  for(let i=0;i<areas.length;i++){
+    let a=i*step;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.lineTo(cx+radius*Math.cos(a), cy+radius*Math.sin(a));
+    ctx.stroke();
+  }
+
+  for(let l=1;l<=levels;l++){
+    ctx.beginPath();
+    ctx.arc(cx,cy,(radius/levels)*l,0,Math.PI*2);
+    ctx.strokeStyle="#e5e7eb"; ctx.lineWidth=0.6;
+    ctx.stroke();
+  }
+
+  ctx.fillStyle="#6b7280"; ctx.font="12px system-ui";
+  for(let l=1;l<=levels;l++){
+    let xPos = cx-10;
+    if(l===10) xPos = cx-15;
+    ctx.fillText(l, xPos, cy+(radius/levels)*l-2);
+  }
+
+  ctx.fillStyle="#111827"; ctx.font="14px system-ui";
+  areas.forEach((area,i)=>{
+    let angle=i*step+step/2;
+    let x=cx+(radius+40)*Math.cos(angle);
+    let y=cy+(radius+40)*Math.sin(angle);
+    ctx.textAlign="center";
+    ctx.textBaseline="bottom";
+    ctx.fillText(area,x,y);
+  });
+}
+
+const sliderBox = document.getElementById("sliders");
+areas.forEach((area,i)=>{
+  const div=document.createElement("div");
+  div.className="card";
+  div.innerHTML = `
+    <label>${area}</label>
+    <div class="row">Nuläge <span id="c${i}">${current[i]}</span></div>
+    <input type="range" min="0" max="10" value="${current[i]}" class="current" id="cs${i}" style="--percent:0">
+    <div class="row">Önskat <span id="d${i}">${desired[i]}</span></div>
+    <input type="range" min="0" max="10" value="${desired[i]}" class="desired" id="ds${i}" style="--percent:0">
+  `;
+  sliderBox.appendChild(div);
+
+  const currentInput = document.getElementById(`cs${i}`);
+  const desiredInput = document.getElementById(`ds${i}`);
+
+  currentInput.oninput = e => {
+    const val=parseInt(e.target.value);
+    current[i]=val;
+    document.getElementById(`c${i}`).innerText=val;
+    e.target.style.setProperty('--percent',(val/10)*100);
+    draw();
+  };
+
+  desiredInput.oninput = e => {
+    const val=parseInt(e.target.value);
+    desired[i]=val;
+    document.getElementById(`d${i}`).innerText=val;
+    e.target.style.setProperty('--percent',(val/10)*100);
+    draw();
+  };
+});
+
+// Tooltip
+canvas.addEventListener('mousemove', e=>{
+  const rect=canvas.getBoundingClientRect();
+  const x=e.clientX-rect.left-cx;
+  const y=e.clientY-rect.top-cy;
+  const angle=Math.atan2(y,x);
+  let adjusted = angle<0? angle+2*Math.PI : angle;
+  const step = 2*Math.PI/areas.length;
+  let idx = Math.floor(adjusted/step);
+  tooltip.style.left = (e.clientX+15) + "px";
+  tooltip.style.top = (e.clientY+15) + "px";
+  tooltip.innerText = tips[idx];
+  tooltip.style.opacity=1;
+});
+canvas.addEventListener('mouseleave',()=>{tooltip.style.opacity=0;});
+
+// Spara som PDF (bara canvas, rubriker på canvas blir kvar)
+document.getElementById('saveBtn').addEventListener('click', () => {
+  draw(); // uppdatera canvas
+  const doc = new jsPDF({unit:'px', format:[650,700]});
+  const imgData = canvas.toDataURL('image/png');
+  doc.addImage(imgData,'PNG',25,25,600,600);
+  doc.save('livshjulet.pdf');
+});
+
+draw();
+</script>
+</body>
+</html>
