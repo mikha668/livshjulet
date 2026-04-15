@@ -101,7 +101,7 @@ button {
 <script>
 const { jsPDF } = window.jspdf;
 
-const areas = ["Träning","Kropp","Sömn","Arbete","Fritid","Relationer","Mat","Utveckling"];
+const areas = ["Träning","Kropp","Sömn","Arbete","Fritid","Relationer","Mat"]; //,"Utveckling"
 const tips = [
 `Träning:\nTränar du regelbundet? Känner du dig stark? Uthållig? Snabb? Smidig? Vilken av de här kvalitéerna är du bra på och vad skulle du vilja förbättra? Hur fungerar rutiner kring träning och återhämtning?`,
 `Kropp:\nHur mår du i kroppen? Känns det skönt i kroppen eller har du ont någonstans? Hur känns din ork och energi? Hur tänker du på storlek och utseende? Hur känner du dig rent fysiskt? Hur är din hållning? Utstrålning? Är du tillfreds med din vikt? Fungerar din mage?`,
@@ -109,8 +109,8 @@ const tips = [
 `Arbete:\nTycker du om ditt jobb? Jobbar du lagom mycket? Hur står det till med relationerna på jobbet? Har du gott självförtroende och självkänsla? Känner du glädje, lustfylldhet, tillhörighet, meningsfullhet?`,
 `Fritid:\nHur känner du kring din fritid? Känner du dig stressad? Fylld av självförtroende, självkänsla? Meningsfullhet? Reflektera kring ärlighet, frihet, lust, glädje, tillhörighet.`,
 `Relationer:\nHur står det till med dina relationer, vänner, familj? Skapar de stress, självförtroende, självkänsla? Känner du glädje, lustfrihet, tillhörighet, meningsfullhet?`,
-`Mat:\nHur tänker du kring mat? Känner du lust och matglädje? Har du starkt sötsug? Vet du vad och när du ska äta för att må bra? Hur ser dina rutiner ut kring måltider och mellanmål?`,
-`Utveckling:\n(reflektera över personlig utveckling, lärande, mål, inspiration, kompetenser, nyfikenhet, kreativitet)`
+`Mat:\nHur tänker du kring mat? Känner du lust och matglädje? Har du starkt sötsug? Vet du vad och när du ska äta för att må bra? Hur ser dina rutiner ut kring måltider och mellanmål?`//,
+//`Utveckling:\n(reflektera över personlig utveckling, lärande, mål, inspiration, kompetenser, nyfikenhet, kreativitet)`
 ];
 const levels = 10;
 let current = Array(areas.length).fill(0);
@@ -225,6 +225,8 @@ canvas.addEventListener('mousemove', e=>{
 canvas.addEventListener('mouseleave',()=>{tooltip.style.opacity=0;});
 
 // Spara som PDF (bara canvas, rubriker på canvas blir kvar)
+
+/*  
 document.getElementById('saveBtn').addEventListener('click', () => {
   draw(); // uppdatera canvas
   const doc = new jsPDF({unit:'px', format:[650,700]});
@@ -234,7 +236,61 @@ document.getElementById('saveBtn').addEventListener('click', () => {
   doc.save(`livshjulet-${today}.pdf`);
   //doc.save('livshjulet.pdf');
 });
+*/
+document.getElementById('saveBtn').addEventListener('click', () => {
+  draw(); // säkerställ att canvas är uppdaterad
 
+  const { jsPDF } = window.jspdf;
+
+  // A4 i portrait. unit=mm gör det lätt att få "riktiga" marginaler.
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  // A4 storlek i mm: 210 x 297
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+
+  // Bestäm marginal (mm)
+  const margin = 15;
+
+  // Max yta som bilden får använda
+  const maxW = pageW - margin * 2;
+  const maxH = pageH - margin * 2;
+
+  // Ta canvas som PNG
+  const imgData = canvas.toDataURL('image/png', 1.0);
+
+  // Canvasens pixelstorlek (inte CSS). Använd de faktiska attributen:
+  const imgPxW = canvas.width;
+  const imgPxH = canvas.height;
+
+  // Bildens ratio
+  const imgRatio = imgPxW / imgPxH;
+
+  // Räkna ut render-storlek i mm så den får plats och behåller proportioner
+  let renderW = maxW;
+  let renderH = renderW / imgRatio;
+
+  if (renderH > maxH) {
+    renderH = maxH;
+    renderW = renderH * imgRatio;
+  }
+
+  // Centrera på sidan
+  const x = (pageW - renderW) / 2;
+  const y = (pageH - renderH) / 2;
+
+  // Lägg in bilden
+  doc.addImage(imgData, 'PNG', x, y, renderW, renderH);
+
+  // Spara
+  const today = new Date().toISOString().slice(0, 10);
+  doc.save(`livshjulet-${today}.pdf`);
+});
+  
 draw();
 </script>
 </body>
