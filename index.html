@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="sv">
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta charset="UTF-8">
 <title>Livshjulet</title>
 <style>
@@ -229,7 +230,9 @@ document.getElementById('saveBtn').addEventListener('click', () => {
   const doc = new jsPDF({unit:'px', format:[650,700]});
   const imgData = canvas.toDataURL('image/png');
   doc.addImage(imgData,'PNG',25,25,600,600);
-  doc.save('livshjulet.pdf');
+  const today = new Date().toISOString().slice(0,10);
+  doc.save(`livshjulet-${today}.pdf`);
+  //doc.save('livshjulet.pdf');
 });
 
 draw();
